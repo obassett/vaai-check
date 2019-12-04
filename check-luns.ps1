@@ -11,4 +11,4 @@ foreach($EsxHost in $ESXHosts){
   }
 }
 
-Write-Host $output
+Write-Output $output
