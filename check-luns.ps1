@@ -15,11 +15,17 @@ $connection = Connect-VIServer $vCenterName
 $ESXHosts = Get-VMHost
 
 # Loop through list of Hosts and Execute a Job to collect the LUN information. This is run multi-threaded so that we don't have to wait for completion to get next server.
+
+###### TO DO ####################
+# We should probably limit the max number of threads!
+# see this: http://www.get-blog.com/?p=22
+# or this: https://adamtheautomator.com/powershell-multithreading/
+###############################
 foreach($EsxHost in $ESXHosts){
   $arrayJobs += Start-Job -ScriptBlock {
     # Import Power-cli Modules
     if (!(Get-module | where {$_.Name -eq "VMware.VimAutomation.Core"})) {Import-Module VMware.VimAutomation.Core}
-    $connection - Connect-VIServer $args[0]
+    $connection = Connect-VIServer $args[0]
     $esxcli = Get-VMHost $args[1] | Get-EsxCli -V2
     $esxclioutput = $esxcli.storage.core.device.vaai.status.get.Invoke()
     foreach ($LUN in $esxclioutput) {
