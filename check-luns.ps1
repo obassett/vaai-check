@@ -9,7 +9,7 @@ $arrayJobs = @()
 ### Code Begins Here
 
 # Connect to vCenter Server
-Connect-VIServer $vCenterName
+$connection = Connect-VIServer $vCenterName
 
 # Get List of ESX Hosts Connected to vCenter Server
 $ESXHosts = Get-VMHost
@@ -19,12 +19,13 @@ foreach($EsxHost in $ESXHosts){
   $arrayJobs += Start-Job -ScriptBlock {
     # Import Power-cli Modules
     if (!(Get-module | where {$_.Name -eq "VMware.VimAutomation.Core"})) {Import-Module VMware.VimAutomation.Core}
-    Connect-VIServer $args[0]
-    $esxcli = Get-VMHost $EsxHost | Get-EsxCli -V2
+    $connection - Connect-VIServer $args[0]
+    $esxcli = Get-VMHost $args[1] | Get-EsxCli -V2
     $esxclioutput = $esxcli.storage.core.device.vaai.status.get.Invoke()
     foreach ($LUN in $esxclioutput) {
       #Output should be: Hostname, Device Name, VAAIPluginName, ATSStatus, CloneStatus, DeleteStatus, ZeroStatus
-      Write-Output "{0},{1},{2},{3},{4},{5},{6}`r`n" -f $esxHost, $LUN.Device, $LUN.VAAIPluginName, $LUN.ATSStatus,$LUN.CloneStatus, $LUN.DeleteStatus, $LUN.ZeroStatus
+      $output = "{0},{1},{2},{3},{4},{5},{6}" -f $args[1], $LUN.Device, $LUN.VAAIPluginName, $LUN.ATSStatus,$LUN.CloneStatus, $LUN.DeleteStatus, $LUN.ZeroStatus
+      Write-Output $output
     }
   } -ArgumentList $vCenterName, $EsxHost
 }
@@ -34,9 +35,12 @@ $complete = $false
 while (-not $complete) {
     $arrayJobsInProgress = $arrayJobs |
         Where-Object { $_.State -match 'running'}
-    if (-not $arrayJobsInProgress) { "All jobs have completed"; $complete = $true }
+    if (-not $arrayJobsInProgress) { $complete = $true }
 }
 
-$output = "{0},{1},{2},{3},{4},{5},{6}`r`n" -f "Hostname", "Device Name", "VAAIPluginName", "ATSStatus", "CloneStatus", "DeleteStatus", "ZeroStatus"
+$output = "{0},{1},{2},{3},{4},{5},{6}" -f "Hostname", "Device Name", "VAAIPluginName", "ATSStatus", "CloneStatus", "DeleteStatus", "ZeroStatus"
 Write-Output $output
-$arrayJobs | Receive-Job
+foreach($job in $arrayJobs) {
+  $job | Receive-Job
+}
+
